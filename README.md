@@ -1,139 +1,123 @@
-# Image Classification with Transfer Learning using VGG16
+# Classificação de Imagens com Transfer Learning usando VGG16
 
-This project demonstrates a powerful and common technique in computer vision: **transfer learning**. We use the **VGG16** model, pre-trained on the extensive ImageNet dataset, and adapt it to a new, specific task: classifying images into one of six categories.
+Neste projeto, eu demonstro uma técnica poderosa e comum em visão computacional: **transfer learning**. Eu utilizei o modelo **VGG16**, pré-treinado no extenso dataset ImageNet, e o adaptei para uma nova tarefa específica: classificar imagens em uma de seis categorias, alcançando até **96% de acurácia** no conjunto de validação.
 
-The training process is strategically divided into two key phases to maximize performance and training stability:
+Eu dividi estrategicamente o processo de treinamento em duas fases principais para maximizar o desempenho e a estabilidade:
 
-1. **Feature Extraction:** We start by freezing the convolutional base of the VGG16 model. This allows us to use its learned features without altering them. We then train only the new, custom classifier that we've added on top. This quickly adapts the model to our new dataset's classes.
+1.  **Extração de Características:** Comecei congelando a base convolucional do modelo VGG16. Isso me permitiu usar suas características já aprendidas sem alterá-las. Em seguida, treinei apenas o novo classificador personalizado que adicionei no topo. Isso adaptou rapidamente o modelo para as classes do meu novo dataset.
 
-2. **Fine-Tuning:** After the initial training, we unfreeze the entire model (or parts of it) and continue training with a very low learning rate. This step slightly adjusts the pre-trained weights to better fit the nuances of our specific dataset, further improving accuracy.
+2.  **Ajuste Fino (Fine-Tuning):** Após o treinamento inicial, eu descongelei o modelo inteiro e continuei o treinamento com uma taxa de aprendizado muito baixa. Este passo ajustou ligeiramente os pesos pré-treinados para se adequarem melhor às nuances do meu dataset específico, melhorando ainda mais a acurácia.
 
-## ⚙️ Key Technologies
+## ⚙️ Tecnologias que Utilizei
 
-* **TensorFlow & Keras:** For building and training the deep learning model.
+* **TensorFlow & Keras:** Para construir e treinar o modelo de deep learning.
+* **VGG16:** A rede neural convolucional (CNN) pré-treinada que usei como modelo base.
+* **ImageDataGenerator:** Para um carregamento de dados eficiente e aumento de dados em tempo real.
 
-* **VGG16:** The pre-trained convolutional neural network (CNN) used as the base model.
+## 🧠 Arquitetura do Modelo
 
-* **ImageDataGenerator:** For efficient data loading and real-time data augmentation.
+Eu construí o modelo final empilhando novas camadas sobre a base pré-treinada VGG16.
 
-## 🧠 Model Architecture
+1.  **Modelo Base (VGG16):** Carreguei o modelo VGG16, descartando sua camada de classificação original (`include_top=False`), mas mantendo os pesos aprendidos com o ImageNet.
 
-The final model is constructed by stacking new layers on top of the pre-trained VGG16 base.
+2.  **Congelamento de Camadas:** Inicialmente, todas as camadas na base VGG16 foram congeladas (`base_model.trainable = False`) para que seus pesos não fossem atualizados durante a primeira fase do treinamento.
 
-1. **Base Model (VGG16):** We load the VGG16 model, discarding its original top classification layer (`include_top=False`) but retaining the weights learned from ImageNet.
+3.  **Classificador Personalizado:** Adicionei minha própria cabeça de classificação:
+    * Uma camada `GlobalAveragePooling2D` para reduzir as dimensões espaciais dos mapas de características para um único vetor, reduzindo drasticamente o número de parâmetros.
+    * Uma camada final `Dense` com 6 unidades (uma para cada classe de destino) e uma função de ativação `softmax` para obter a distribuição de probabilidade entre as classes.
 
-2. **Freezing Layers:** Initially, all layers in the VGG16 base are frozen (`base_model.trainable = False`) so their weights are not updated during the first phase of training.
+## 📦 Preparação e Aumento de Dados
 
-3. **Custom Classifier:** We add our own classification head:
+Para tornar o modelo mais robusto e evitar overfitting, apliquei aumento de dados (data augmentation) nas imagens de treinamento em tempo real usando o `ImageDataGenerator`. As transformações aplicadas incluem:
 
-   * A `GlobalAveragePooling2D` layer to reduce the spatial dimensions of the feature maps into a single vector per map, drastically reducing the number of parameters.
+* Rotações aleatórias
+* Zoom aleatório
+* Deslocamentos horizontais e verticais aleatórios
+* Inversões horizontais aleatórias
 
-   * A final `Dense` layer with 6 units (one for each target class) and a `softmax` activation function to output the probability distribution across the classes.
+Os dados de validação não foram aumentados; eu apenas reescalei, assim como fiz com os dados de treinamento.
 
-## 📦 Data Preparation & Augmentation
+## 🚀 Processo de Treinamento
 
-To make the model more robust and prevent overfitting, we apply data augmentation to the training images on-the-fly using `ImageDataGenerator`. This creates modified versions of the images at each epoch. The applied transformations include:
+### Fase 1: Extração de Características
 
-* Random rotations
+Primeiro, compilei o modelo com o otimizador `adam` e a perda `CategoricalCrossentropy`. Eu o treinei por 20 épocas. Nesta fase, apenas os pesos das camadas `GlobalAveragePooling2D` e `Dense` foram atualizados. Esta fase de treinamento inicial me permitiu alcançar uma acurácia sólida de **94%** no conjunto de validação.
 
-* Random zooming
-
-* Random horizontal and vertical shifts
-
-* Random horizontal flips
-
-The validation data is not augmented; we only rescale it, just as we do with the training data. The data is loaded from structured directories where each sub-directory corresponds to a single class.
-
-## 🚀 Training Process
-
-### Phase 1: Feature Extraction
-
-The model is first compiled with the `adam` optimizer and `CategoricalCrossentropy` loss. We train it for 20 epochs. In this phase, only the weights of the `GlobalAveragePooling2D` and `Dense` layers are updated.
-
-```
-# Freeze the base model
+```python
+# Congelar o modelo base
 base_model.trainable = False
 
-# Compile the model
+# Compilar o modelo
 model.compile(
     optimizer='adam',
     loss=keras.losses.CategoricalCrossentropy(from_logits=False),
     metrics=[keras.metrics.CategoricalAccuracy()]
 )
 
-# Train only the top layers
+# Treinar apenas as camadas superiores
 model.fit(train_it,
           validation_data=valid_it,
           epochs=20)
-
 ```
 
-### Phase 2: Fine-Tuning
+### Fase 2: Ajuste Fino (Fine-Tuning)
 
-Next, we unfreeze the base model to allow all weights to be trainable. The model is then re-compiled with a very low learning rate (`0.0001`) and the `RMSprop` optimizer. Using a low learning rate is crucial to prevent catastrophic forgetting—losing the valuable features learned from ImageNet.
+Em seguida, descongelei o modelo base para permitir que todos os seus pesos fossem treináveis. Recompilei o modelo com uma taxa de aprendizado muito baixa (`0.0001`) e o otimizador `RMSprop`. Usei uma taxa de aprendizado baixa, o que é crucial para não destruir as características valiosas aprendidas com o ImageNet. Treinei o modelo por mais 20 épocas. Este passo elevou a acurácia de validação para impressionantes **96%**.
 
-The model is then trained for another 20 epochs, allowing the entire network to gently adapt to the new dataset.
-
-```
-# Unfreeze the base model to allow fine-tuning
+```python
+# Descongelar o modelo base para permitir o ajuste fino
 base_model.trainable = True
 
-# Re-compile with a very low learning rate
+# Recompilar com uma taxa de aprendizado muito baixa
 model.compile(optimizer=keras.optimizers.RMSprop(learning_rate = 0.0001),
               loss = keras.losses.CategoricalCrossentropy(from_logits=False),
               metrics =[keras.metrics.CategoricalAccuracy()])
 
-# Continue training the entire model
+# Continuar o treinamento do modelo inteiro
 model.fit(train_it,
           validation_data=valid_it,
           epochs=20)
-
 ```
 
-## 📋 How to Use
+## 📈 Resultados
 
-1. **Clone the Repository:**
+A minha abordagem de treinamento em duas fases produziu excelentes resultados:
 
-   ```
-   git clone <your-repository-url>
-   cd <repository-name>
-   
-   ```
+* **Acurácia de Extração de Características (Fase 1):** **94%** no conjunto de validação.
+* **Acurácia de Ajuste Fino (Fase 2):** **96%** no conjunto de validação.
 
-2. **Organize Your Data:** Ensure your image dataset is structured in the following way:
+Isso demonstra o poder do transfer learning e como uma segunda fase de ajuste fino pode proporcionar um aumento adicional de desempenho, adaptando as características aprendidas mais de perto ao dataset específico.
 
-   ```
-   dataset/
-   ├── train/
-   │   ├── class_1/
-   │   │   ├── image1.jpg
-   │   │   └── image2.jpg
-   │   └── class_2/
-   │       ├── image3.jpg
-   │       └── image4.jpg
-   └── valid/
-       ├── class_1/
-       │   ├── image5.jpg
-       │   └── image6.jpg
-       └── class_2/
-           ├── image7.jpg
-           └── image8.jpg
-   
-   ```
+## 📋 Como Usar
 
-3. **Update File Paths:** In the Python script, change the paths in the `flow_from_directory` calls to point to your `train` and `valid` directories.
+1.  **Clonar o Repositório:**
+    ```bash
+    git clone <url-do-seu-repositorio>
+    cd <nome-do-repositorio>
+    ```
 
-   ```
-   train_it = datagen_train.flow_from_directory(
-       'path/to/your/dataset/train',
-       # ... other parameters
-   )
-   
-   valid_it = datagen_valid.flow_from_directory(
-       'path/to/your/dataset/valid',
-       # ... other parameters
-   )
-   
-   ```
+2.  **Organizar os Dados:** Certifique-se de que seu conjunto de dados de imagem esteja estruturado da seguinte maneira:
+    ```
+    dataset/
+    ├── train/
+    │   ├── classe_1/
+    │   └── classe_2/
+    └── valid/
+        ├── classe_1/
+        └── classe_2/
+    ```
 
-4. **Run the script** to start the training process.
+3.  **Atualizar os Caminhos dos Arquivos:** No script Python, altere os caminhos nas chamadas `flow_from_directory` para que apontem para seus diretórios `train` e `valid`.
+    ```python
+    train_it = datagen_train.flow_from_directory(
+        'caminho/para/seu/dataset/train',
+        # ... outros parâmetros
+    )
+    
+    valid_it = datagen_valid.flow_from_directory(
+        'caminho/para/seu/dataset/valid',
+        # ... outros parâmetros
+    )
+    ```
+
+4.  **Executar** o script para iniciar o processo de treinamento.
